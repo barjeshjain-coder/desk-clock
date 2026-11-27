@@ -36,78 +36,65 @@
     cursor: default;
   }
   #stage {
-    position: fixed; inset: 0;
-    padding: max(3vh, env(safe-area-inset-top)) max(5vw, env(safe-area-inset-right)) calc(max(1.6vh, env(safe-area-inset-bottom)) + 7vh) max(5vw, env(safe-area-inset-left));
-    display: flex; flex-direction: row; align-items: center; gap: 4vw;
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    padding: 4vh 4vw 9vh 4vw;
+    display: flex; flex-direction: row; align-items: center;
     transition: opacity 2s ease, transform 3s ease;
   }
   body.night #stage { opacity: .42; }
 
-  /* Clock */
-  .clock { flex: 1.5 1 0; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
-  .time {
-    display: flex; align-items: flex-start; line-height: .86;
-    font-weight: 200; letter-spacing: -.04em;
-    font-size: min(16.5vw, 40vh);
-  }
+  /* Sizes below are starting points; fit() in the script scales them to fill the actual screen. */
+  .clock { flex: 1.55 1 0; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
+  .time { display: inline-flex; align-items: flex-start; line-height: .86; font-weight: 200; letter-spacing: -.04em; font-size: 120px; white-space: nowrap; }
   .time .colon { animation: blink 2s steps(1) infinite; padding: 0 .02em; }
   @keyframes blink { 50% { opacity: .25; } }
   .time .side { display: flex; flex-direction: column; justify-content: space-between; margin-left: .12em; padding-top: .06em; height: .74em; }
   .time .sec, .time .ampm { font-size: .17em; font-weight: 300; letter-spacing: .02em; color: var(--dim); line-height: 1; }
-  .date {
-    margin-top: 2.2vh;
-    font-size: min(2.7vw, 5.2vh); font-weight: 300; letter-spacing: .14em; padding-left: .3em; text-transform: uppercase; color: var(--fg);
-  }
+  .date { display: inline-block; margin-top: .4em; font-size: 24px; font-weight: 300; letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; padding-left: .2em; }
   .date .wd { font-weight: 500; }
 
-  hr { border: 0; border-left: 1px solid var(--line); align-self: stretch; margin: 4vh 0; }
+  hr { border: 0; border-left: 1px solid var(--line); align-self: stretch; margin: 2vh 3.5vw; }
 
-  /* Weather + AQI */
-  .info { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 5vh; }
-  .block { min-width: 0; }
-    .label { font-size: min(1.6vw, 2.8vh); letter-spacing: .22em; text-transform: uppercase; color: var(--dim); font-weight: 400; }
-  .big { font-size: min(7vw, 13vh); font-weight: 200; line-height: 1; letter-spacing: -.03em; margin: .6vh 0 .4vh; }
+  .info { flex: 1 1 0; min-width: 0; font-size: 20px; }
+  .info-in { display: inline-block; }
+  .block + .block { margin-top: 1.1em; }
+  .label { font-size: .5em; letter-spacing: .22em; text-transform: uppercase; color: var(--dim); white-space: nowrap; }
+  .big { font-size: 2.9em; font-weight: 200; line-height: 1; letter-spacing: -.03em; margin: .06em 0 .02em; white-space: nowrap; }
   .big .unit { font-size: .45em; vertical-align: .75em; letter-spacing: 0; color: var(--dim); margin-left: .04em; }
-  .row { display: flex; gap: 1.2em; align-items: baseline; flex-wrap: wrap; }
-    .cond { font-size: min(2.6vw, 4.6vh); font-weight: 400; }
-  .meta { font-size: min(1.9vw, 3.4vh); color: var(--dim); font-weight: 300; margin-top: .5vh; }
+  .cond { font-size: .95em; white-space: nowrap; }
+  .meta { font-size: .62em; color: var(--dim); font-weight: 300; margin-top: .3em; white-space: nowrap; }
   .meta b { color: var(--fg); font-weight: 400; }
 
   /* AQI scale: six cells, filled up to the current band (no colour, just fill) */
-  .scale { display: flex; gap: .5vw; margin-top: 1.2vh; }
-  .scale i { display: block; width: min(3.2vw, 6vh); height: min(.8vw, 1.3vh); border: 1px solid var(--dim); border-radius: 1px; }
+  .scale { display: flex; margin-top: .55em; }
+  .scale i { display: block; width: 1.5em; height: .3em; margin-right: .22em; border: 1px solid var(--dim); border-radius: 1px; }
   .scale i.on { background: var(--fg); border-color: var(--fg); }
 
   .foot {
     position: fixed; left: 0; right: 0; bottom: 0;
-    padding: 0 max(5vw, env(safe-area-inset-right)) max(1.6vh, env(safe-area-inset-bottom)) max(5vw, env(safe-area-inset-left));
+    padding: 0 4vw 1.6vh 4vw;
     display: flex; justify-content: space-between; align-items: center;
-    font-size: min(1.9vw, 2.8vh); color: var(--faint); letter-spacing: .08em;
+    font-size: 2.8vh; color: var(--faint); letter-spacing: .08em;
   }
   .foot button { all: unset; cursor: pointer; padding: 1vh 1vw; color: var(--faint); letter-spacing: .14em; text-transform: uppercase; }
   .foot button:focus-visible { outline: 1px solid var(--dim); }
 
-  /* Portrait: stack weather and air quality */
+  /* Portrait: clock on top, weather and air quality below */
   @media (orientation: portrait) {
-    #stage { flex-direction: column; align-items: stretch; justify-content: center; gap: 3vh; }
+    #stage { flex-direction: column; align-items: stretch; justify-content: center; padding: 5vh 6vw 9vh 6vw; }
     .clock { flex: none; align-items: center; }
-    .time { font-size: 26vw; }
-    .date { font-size: 4.4vw; padding-left: 0; }
-    hr { border-left: 0; border-top: 1px solid var(--line); margin: 1vh 0; }
-    .info { flex: none; gap: 5vh; }
-    .big { font-size: 20vw; }
-    .label { font-size: 3vw; } .cond { font-size: 5vw; } .meta { font-size: 3.6vw; }
-    .scale i { width: 8vw; height: 1.4vw; }
-    .foot { font-size: 2.8vw; }
+    hr { border-left: 0; border-top: 1px solid var(--line); margin: 3vh 0; }
+    .info { flex: none; }
+    .foot { font-size: 1.4vh; padding: 0 6vw 1.6vh 6vw; }
   }
 
   /* Settings */
   #settings {
-    position: fixed; inset: 0; background: rgba(0,0,0,.94); display: flex; align-items: center; justify-content: center;
-    padding: 4vh max(5vw, env(safe-area-inset-right)) 4vh max(5vw, env(safe-area-inset-left)); z-index: 5;
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.94); display: flex; align-items: center; justify-content: center;
+    padding: 4vh 5vw; z-index: 5;
   }
   #settings[hidden] { display: none; }
-  .panel { width: min(560px, 100%); max-height: 100%; overflow: auto; display: flex; flex-direction: column; gap: 18px; font-size: 16px; user-select: text; -webkit-user-select: text; }
+  .panel { width: 560px; max-width: 100%; max-height: 100%; overflow: auto; display: flex; flex-direction: column; gap: 18px; font-size: 16px; user-select: text; -webkit-user-select: text; }
   .panel h2 { margin: 0; font-weight: 300; letter-spacing: .2em; text-transform: uppercase; font-size: 15px; color: var(--dim); }
   .panel input[type=text] {
     width: 100%; background: #000; color: #fff; border: 1px solid #555; border-radius: 4px; padding: 12px 14px; font: inherit; font-size: 18px;
@@ -143,12 +130,13 @@
     <div class="date" id="date"></div>
   </div>
   <hr>
-  <div class="info">
+  <div class="info"><div class="info-in">
     <div class="block">
       <div class="label">Weather</div>
       <div class="big"><span id="temp">--</span><span class="unit" id="tunit">°</span></div>
       <div class="row"><span class="cond" id="cond">Loading</span></div>
       <div class="meta" id="wmeta">&nbsp;</div>
+      <div class="meta" id="wmeta2">&nbsp;</div>
     </div>
     <div class="block">
       <div class="label">Air quality · US AQI</div>
@@ -157,7 +145,7 @@
       <div class="meta" id="ameta">&nbsp;</div>
       <div class="scale" id="scale"><i></i><i></i><i></i><i></i><i></i><i></i></div>
     </div>
-  </div>
+  </div></div>
 </div>
 
 <div class="foot">
@@ -188,12 +176,12 @@
   const $ = id => document.getElementById(id);
   const STORE = "deskclock.v1";
   const defaults = { h24: false, secs: true, fahr: false, night: true, loc: null };
-  let cfg = { ...defaults };
+  let cfg = Object.assign({}, defaults);
   try { Object.assign(cfg, JSON.parse(localStorage.getItem(STORE) || "{}")); } catch (e) {}
   const save = () => { try { localStorage.setItem(STORE, JSON.stringify(cfg)); } catch (e) {} };
 
   /* ---------- Clock ---------- */
-  const pad = n => String(n).padStart(2, "0");
+  const pad = n => ("0" + n).slice(-2);
   const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
   const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
   let lastMin = -1;
@@ -215,6 +203,7 @@
       // Nudge the layout a few pixels each minute so an OLED screen doesn't burn in.
       const dx = Math.round(Math.random() * 12 - 6), dy = Math.round(Math.random() * 12 - 6);
       $("stage").style.transform = `translate(${dx}px, ${dy}px)`;
+      if (typeof fit === "function") fit();
     }
   }
   setInterval(tick, 250);
@@ -250,14 +239,9 @@
       $("temp").textContent = r(c.temperature_2m);
       $("tunit").textContent = cfg.fahr ? "°F" : "°C";
       $("cond").textContent = WMO[c.weather_code] || "—";
-      $("wmeta").innerHTML = "";
-      const parts = [["H", r(w.daily.temperature_2m_max[0]) + "°"], ["L", r(w.daily.temperature_2m_min[0]) + "°"], ["Feels", r(c.apparent_temperature) + "°"], ["Humidity", c.relative_humidity_2m + "%"]];
-      parts.forEach(([k, v], i) => {
-        if (i) $("wmeta").append(document.createTextNode("  ·  "));
-        $("wmeta").append(document.createTextNode(k + " "));
-        const b = document.createElement("b"); b.textContent = v; $("wmeta").append(b);
-      });
-      stamp();
+      pairs($("wmeta"), [["High", r(w.daily.temperature_2m_max[0]) + "°"], ["Low", r(w.daily.temperature_2m_min[0]) + "°"]]);
+      pairs($("wmeta2"), [["Feels", r(c.apparent_temperature) + "°"], ["Humidity", c.relative_humidity_2m + "%"]]);
+      stamp(); fit();
     } catch (e) { $("status").textContent = "Weather unavailable. Retrying soon."; }
   }
 
@@ -270,17 +254,61 @@
       $("aqi").textContent = isFinite(v) ? v : "--";
       const band = AQI_BANDS.findIndex(([max]) => v <= max);
       $("aqiText").textContent = band >= 0 ? AQI_BANDS[band][1] : "—";
-      [...$("scale").children].forEach((el, i) => el.classList.toggle("on", i <= band));
-      $("ameta").innerHTML = "";
-      [["PM2.5", r(c.pm2_5)], ["PM10", r(c.pm10)]].forEach(([k, val], i) => {
-        if (i) $("ameta").append(document.createTextNode("  ·  "));
-        $("ameta").append(document.createTextNode(k + " "));
-        const b = document.createElement("b"); b.textContent = val; $("ameta").append(b);
-      });
-      $("ameta").append(document.createTextNode(" µg/m³"));
-      stamp();
+      Array.prototype.forEach.call($("scale").children, (el, i) => el.classList.toggle("on", i <= band));
+      pairs($("ameta"), [["PM2.5", r(c.pm2_5)], ["PM10", r(c.pm10)]]);
+      $("ameta").appendChild(document.createTextNode(" µg/m³"));
+      stamp(); fit();
     } catch (e) { $("status").textContent = "Air quality unavailable. Retrying soon."; }
   }
+
+  function pairs(el, list) {
+    el.innerHTML = "";
+    list.forEach((kv, i) => {
+      if (i) el.appendChild(document.createTextNode("  ·  "));
+      el.appendChild(document.createTextNode(kv[0] + " "));
+      const b = document.createElement("b"); b.textContent = kv[1]; el.appendChild(b);
+    });
+  }
+
+  /* ---------- Fill the screen ---------- */
+  // Measures the content at a known size, then scales it so the clock fills its side
+  // and weather/AQI fill theirs, whatever the phone's screen shape.
+  function fit() {
+    const stage = $("stage"), cs = getComputedStyle(stage);
+    const W = stage.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const H = stage.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    if (W <= 0 || H <= 0) return;
+    const portrait = window.innerHeight > window.innerWidth;
+    const clock = document.querySelector(".clock"), info = document.querySelector(".info"), inner = document.querySelector(".info-in");
+    const time = document.querySelector(".time"), date = $("date"), hr = document.querySelector("hr");
+
+    // Clock: measure the time as shown now (refitted every minute, so 9:59 -> 10:00 still fits).
+    time.style.fontSize = "100px"; date.style.fontSize = "100px";
+    const tw = time.getBoundingClientRect().width, th = time.getBoundingClientRect().height;
+    const dw = date.getBoundingClientRect().width, dh = date.getBoundingClientRect().height + 40;
+
+    const cW = (portrait ? W : clock.getBoundingClientRect().width) * 0.97;
+    const cHmax = portrait ? H * 0.46 : H;
+    let tf = Math.min(cW / tw, cHmax * 0.74 / th) * 100;
+    let df = Math.min(cW / dw * 100, tf * 0.17);
+    const used = (th * tf + dh * df) / 100;
+    if (used > cHmax) { const k = cHmax / used; tf *= k; df *= k; }
+    time.style.fontSize = tf.toFixed(1) + "px"; date.style.fontSize = df.toFixed(1) + "px";
+
+    // Weather + AQI panel
+    info.style.fontSize = "20px";
+    const iw = inner.getBoundingClientRect().width, ih = inner.getBoundingClientRect().height;
+    let iW, iH;
+    if (portrait) {
+      const hm = getComputedStyle(hr);
+      iW = W; iH = H - clock.getBoundingClientRect().height - hr.offsetHeight - parseFloat(hm.marginTop) - parseFloat(hm.marginBottom);
+    } else { iW = info.getBoundingClientRect().width; iH = H; }
+    const f = 20 * Math.min(iW * 0.97 / iw, iH * 0.97 / ih);
+    if (f > 0) info.style.fontSize = f.toFixed(1) + "px";
+  }
+  window.addEventListener("resize", fit);
+  window.addEventListener("orientationchange", () => setTimeout(fit, 300));
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
 
   function stamp() {
     $("status").textContent = (cfg.loc ? cfg.loc.name : "") + "  ·  updated " + timeStr(new Date().toISOString());
@@ -312,7 +340,7 @@
   document.querySelectorAll(".seg").forEach(seg => seg.addEventListener("click", e => {
     const b = e.target.closest("button"); if (!b) return;
     const k = seg.dataset.key, before = cfg[k];
-    cfg[k] = b.dataset.v === "true"; save(); syncSeg(); lastMin = -1; tick();
+    cfg[k] = b.dataset.v === "true"; save(); syncSeg(); lastMin = -1; tick(); fit();
     if (k === "fahr" && before !== cfg[k]) loadWeather();
   }));
 
@@ -362,7 +390,7 @@
   const qs = new URLSearchParams(location.search);
   if (qs.get("lat") && qs.get("lon")) { cfg.loc = { name: qs.get("city") || "My location", lat: +qs.get("lat"), lon: +qs.get("lon") }; save(); }
 
-  tick();
+  tick(); fit();
   if (cfg.loc) refreshAll(); else openSettings();
   if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
 })();
