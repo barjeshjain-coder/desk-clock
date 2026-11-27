@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<title>Desk Clock</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@200;300;400;500&display=swap">
+<style>
+  /* Layout: one black screen. Huge time on top, date under it, a hairline, then weather left / air quality right. */
+  :root {
+    --bg: #000;
+    --fg: #fff;
+    --dim: #8c8c8c;
+    --faint: #3a3a3a;
+    --line: #262626;
+    --font: "Inter Tight", "Helvetica Neue", Arial, system-ui, sans-serif;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: var(--bg); color: var(--fg); }
+  body {
+    font-family: var(--font);
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none; -webkit-user-select: none;
+    cursor: default;
+  }
+  #stage {
+    position: fixed; inset: 0;
+    padding: max(3vh, env(safe-area-inset-top)) max(5vw, env(safe-area-inset-right)) calc(max(1.6vh, env(safe-area-inset-bottom)) + 7vh) max(5vw, env(safe-area-inset-left));
+    display: flex; flex-direction: row; align-items: center; gap: 4vw;
+    transition: opacity 2s ease, transform 3s ease;
+  }
+  body.night #stage { opacity: .42; }
+
+  /* Clock */
+  .clock { flex: 1.5 1 0; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
+  .time {
+    display: flex; align-items: flex-start; line-height: .86;
+    font-weight: 200; letter-spacing: -.04em;
+    font-size: min(16.5vw, 40vh);
+  }
+  .time .colon { animation: blink 2s steps(1) infinite; padding: 0 .02em; }
+  @keyframes blink { 50% { opacity: .25; } }
+  .time .side { display: flex; flex-direction: column; justify-content: space-between; margin-left: .12em; padding-top: .06em; height: .74em; }
+  .time .sec, .time .ampm { font-size: .17em; font-weight: 300; letter-spacing: .02em; color: var(--dim); line-height: 1; }
+  .date {
+    margin-top: 2.2vh;
+    font-size: min(2.7vw, 5.2vh); font-weight: 300; letter-spacing: .14em; padding-left: .3em; text-transform: uppercase; color: var(--fg);
+  }
+  .date .wd { font-weight: 500; }
+
+  hr { border: 0; border-left: 1px solid var(--line); align-self: stretch; margin: 4vh 0; }
+
+  /* Weather + AQI */
+  .info { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 5vh; }
+  .block { min-width: 0; }
+    .label { font-size: min(1.6vw, 2.8vh); letter-spacing: .22em; text-transform: uppercase; color: var(--dim); font-weight: 400; }
+  .big { font-size: min(7vw, 13vh); font-weight: 200; line-height: 1; letter-spacing: -.03em; margin: .6vh 0 .4vh; }
+  .big .unit { font-size: .45em; vertical-align: .75em; letter-spacing: 0; color: var(--dim); margin-left: .04em; }
+  .row { display: flex; gap: 1.2em; align-items: baseline; flex-wrap: wrap; }
+    .cond { font-size: min(2.6vw, 4.6vh); font-weight: 400; }
+  .meta { font-size: min(1.9vw, 3.4vh); color: var(--dim); font-weight: 300; margin-top: .5vh; }
+  .meta b { color: var(--fg); font-weight: 400; }
+
+  /* AQI scale: six cells, filled up to the current band (no colour, just fill) */
+  .scale { display: flex; gap: .5vw; margin-top: 1.2vh; }
+  .scale i { display: block; width: min(3.2vw, 6vh); height: min(.8vw, 1.3vh); border: 1px solid var(--dim); border-radius: 1px; }
+  .scale i.on { background: var(--fg); border-color: var(--fg); }
+
+  .foot {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    padding: 0 max(5vw, env(safe-area-inset-right)) max(1.6vh, env(safe-area-inset-bottom)) max(5vw, env(safe-area-inset-left));
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: min(1.9vw, 2.8vh); color: var(--faint); letter-spacing: .08em;
+  }
+  .foot button { all: unset; cursor: pointer; padding: 1vh 1vw; color: var(--faint); letter-spacing: .14em; text-transform: uppercase; }
+  .foot button:focus-visible { outline: 1px solid var(--dim); }
+
+  /* Portrait: stack weather and air quality */
+  @media (orientation: portrait) {
+    #stage { flex-direction: column; align-items: stretch; justify-content: center; gap: 3vh; }
+    .clock { flex: none; align-items: center; }
+    .time { font-size: 26vw; }
+    .date { font-size: 4.4vw; padding-left: 0; }
+    hr { border-left: 0; border-top: 1px solid var(--line); margin: 1vh 0; }
+    .info { flex: none; gap: 5vh; }
+    .big { font-size: 20vw; }
+    .label { font-size: 3vw; } .cond { font-size: 5vw; } .meta { font-size: 3.6vw; }
+    .scale i { width: 8vw; height: 1.4vw; }
+    .foot { font-size: 2.8vw; }
+  }
+
+  /* Settings */
+  #settings {
+    position: fixed; inset: 0; background: rgba(0,0,0,.94); display: flex; align-items: center; justify-content: center;
+    padding: 4vh max(5vw, env(safe-area-inset-right)) 4vh max(5vw, env(safe-area-inset-left)); z-index: 5;
+  }
+  #settings[hidden] { display: none; }
+  .panel { width: min(560px, 100%); max-height: 100%; overflow: auto; display: flex; flex-direction: column; gap: 18px; font-size: 16px; user-select: text; -webkit-user-select: text; }
+  .panel h2 { margin: 0; font-weight: 300; letter-spacing: .2em; text-transform: uppercase; font-size: 15px; color: var(--dim); }
+  .panel input[type=text] {
+    width: 100%; background: #000; color: #fff; border: 1px solid #555; border-radius: 4px; padding: 12px 14px; font: inherit; font-size: 18px;
+  }
+  .panel input[type=text]:focus { outline: none; border-color: #fff; }
+  .results { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+  .results button, .opt button, .actions button {
+    all: unset; cursor: pointer; padding: 12px 4px; border-bottom: 1px solid var(--line); color: #fff;
+  }
+  .results button small { color: var(--dim); margin-left: 8px; }
+  .results button:hover, .results button:focus-visible { background: #111; }
+  .opt { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .opt span { color: var(--dim); }
+  .seg { display: flex; border: 1px solid #555; border-radius: 4px; overflow: hidden; }
+  .seg button { all: unset; cursor: pointer; padding: 8px 14px; color: var(--dim); }
+  .seg button[aria-pressed=true] { background: #fff; color: #000; }
+  .seg button:focus-visible { outline: 1px solid #fff; outline-offset: -3px; }
+  .actions { display: flex; justify-content: space-between; gap: 12px; }
+  .actions button { border: 1px solid #555; border-radius: 4px; padding: 10px 18px; }
+  .actions button.primary { background: #fff; color: #000; border-color: #fff; }
+  .hint { color: var(--dim); font-size: 14px; line-height: 1.5; margin: 0; }
+
+  @media (prefers-reduced-motion: reduce) { .time .colon { animation: none; } #stage { transition: none; } }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="clock">
+    <div class="time" aria-live="off">
+      <span id="hh">--</span><span class="colon">:</span><span id="mm">--</span>
+      <span class="side"><span class="ampm" id="ampm"></span><span class="sec" id="ss"></span></span>
+    </div>
+    <div class="date" id="date"></div>
+  </div>
+  <hr>
+  <div class="info">
+    <div class="block">
+      <div class="label">Weather</div>
+      <div class="big"><span id="temp">--</span><span class="unit" id="tunit">°</span></div>
+      <div class="row"><span class="cond" id="cond">Loading</span></div>
+      <div class="meta" id="wmeta">&nbsp;</div>
+    </div>
+    <div class="block">
+      <div class="label">Air quality · US AQI</div>
+      <div class="big" id="aqi">--</div>
+      <div class="row"><span class="cond" id="aqiText">Loading</span></div>
+      <div class="meta" id="ameta">&nbsp;</div>
+      <div class="scale" id="scale"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    </div>
+  </div>
+</div>
+
+<div class="foot">
+  <span id="status"></span>
+  <button id="openSettings" type="button" aria-label="Open settings">Settings</button>
+</div>
+
+<div id="settings" hidden>
+  <div class="panel" role="dialog" aria-labelledby="setTitle">
+    <h2 id="setTitle">Location</h2>
+    <input type="text" id="cityInput" placeholder="Type your city, e.g. Bengaluru" autocomplete="off">
+    <div class="results" id="results"></div>
+    <h2>Display</h2>
+    <div class="opt"><span>Clock</span><div class="seg" data-key="h24"><button type="button" data-v="false">12 h</button><button type="button" data-v="true">24 h</button></div></div>
+    <div class="opt"><span>Seconds</span><div class="seg" data-key="secs"><button type="button" data-v="true">Show</button><button type="button" data-v="false">Hide</button></div></div>
+    <div class="opt"><span>Temperature</span><div class="seg" data-key="fahr"><button type="button" data-v="false">°C</button><button type="button" data-v="true">°F</button></div></div>
+    <div class="opt"><span>Dim 10 pm – 6 am</span><div class="seg" data-key="night"><button type="button" data-v="true">On</button><button type="button" data-v="false">Off</button></div></div>
+    <p class="hint">Tap anywhere on the clock to go full screen and keep the screen awake.</p>
+    <div class="actions">
+      <button type="button" id="useGps">Use my location</button>
+      <button type="button" class="primary" id="closeSettings">Done</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const STORE = "deskclock.v1";
+  const defaults = { h24: false, secs: true, fahr: false, night: true, loc: null };
+  let cfg = { ...defaults };
+  try { Object.assign(cfg, JSON.parse(localStorage.getItem(STORE) || "{}")); } catch (e) {}
+  const save = () => { try { localStorage.setItem(STORE, JSON.stringify(cfg)); } catch (e) {} };
+
+  /* ---------- Clock ---------- */
+  const pad = n => String(n).padStart(2, "0");
+  const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  let lastMin = -1;
+  function tick() {
+    const d = new Date();
+    let h = d.getHours();
+    $("ampm").textContent = cfg.h24 ? "" : (h < 12 ? "AM" : "PM");
+    if (!cfg.h24) h = h % 12 || 12;
+    $("hh").textContent = cfg.h24 ? pad(h) : String(h);
+    $("mm").textContent = pad(d.getMinutes());
+    $("ss").textContent = cfg.secs ? pad(d.getSeconds()) : "";
+    if (d.getMinutes() !== lastMin) {
+      lastMin = d.getMinutes();
+      $("date").innerHTML = "";
+      const wd = document.createElement("span"); wd.className = "wd"; wd.textContent = DAYS[d.getDay()];
+      $("date").append(wd, document.createTextNode(" · " + d.getDate() + " " + MONTHS[d.getMonth()] + " " + d.getFullYear()));
+      const hr = d.getHours();
+      document.body.classList.toggle("night", cfg.night && (hr >= 22 || hr < 6));
+      // Nudge the layout a few pixels each minute so an OLED screen doesn't burn in.
+      const dx = Math.round(Math.random() * 12 - 6), dy = Math.round(Math.random() * 12 - 6);
+      $("stage").style.transform = `translate(${dx}px, ${dy}px)`;
+    }
+  }
+  setInterval(tick, 250);
+
+  /* ---------- Weather ---------- */
+  const WMO = {
+    0:"Clear",1:"Mostly clear",2:"Partly cloudy",3:"Overcast",45:"Fog",48:"Freezing fog",
+    51:"Light drizzle",53:"Drizzle",55:"Heavy drizzle",56:"Freezing drizzle",57:"Freezing drizzle",
+    61:"Light rain",63:"Rain",65:"Heavy rain",66:"Freezing rain",67:"Freezing rain",
+    71:"Light snow",73:"Snow",75:"Heavy snow",77:"Snow grains",
+    80:"Light showers",81:"Showers",82:"Heavy showers",85:"Snow showers",86:"Snow showers",
+    95:"Thunderstorm",96:"Thunderstorm, hail",99:"Thunderstorm, hail"
+  };
+  const AQI_BANDS = [
+    [50,"Good"],[100,"Moderate"],[150,"Unhealthy for some"],[200,"Unhealthy"],[300,"Very unhealthy"],[Infinity,"Hazardous"]
+  ];
+  const r = n => Math.round(n);
+  const timeStr = iso => { const t = new Date(iso); let h = t.getHours(); const m = pad(t.getMinutes()); if (cfg.h24) return pad(h)+":"+m; return (h%12||12)+":"+m+(h<12?" am":" pm"); };
+
+  async function getJSON(url) {
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return res.json();
+  }
+
+  async function loadWeather() {
+    if (!cfg.loc) return;
+    const { lat, lon } = cfg.loc;
+    const u = cfg.fahr ? "&temperature_unit=fahrenheit" : "";
+    try {
+      const w = await getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1${u}`);
+      const c = w.current;
+      $("temp").textContent = r(c.temperature_2m);
+      $("tunit").textContent = cfg.fahr ? "°F" : "°C";
+      $("cond").textContent = WMO[c.weather_code] || "—";
+      $("wmeta").innerHTML = "";
+      const parts = [["H", r(w.daily.temperature_2m_max[0]) + "°"], ["L", r(w.daily.temperature_2m_min[0]) + "°"], ["Feels", r(c.apparent_temperature) + "°"], ["Humidity", c.relative_humidity_2m + "%"]];
+      parts.forEach(([k, v], i) => {
+        if (i) $("wmeta").append(document.createTextNode("  ·  "));
+        $("wmeta").append(document.createTextNode(k + " "));
+        const b = document.createElement("b"); b.textContent = v; $("wmeta").append(b);
+      });
+      stamp();
+    } catch (e) { $("status").textContent = "Weather unavailable. Retrying soon."; }
+  }
+
+  async function loadAir() {
+    if (!cfg.loc) return;
+    const { lat, lon } = cfg.loc;
+    try {
+      const a = await getJSON(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=us_aqi,pm2_5,pm10&timezone=auto`);
+      const c = a.current, v = r(c.us_aqi);
+      $("aqi").textContent = isFinite(v) ? v : "--";
+      const band = AQI_BANDS.findIndex(([max]) => v <= max);
+      $("aqiText").textContent = band >= 0 ? AQI_BANDS[band][1] : "—";
+      [...$("scale").children].forEach((el, i) => el.classList.toggle("on", i <= band));
+      $("ameta").innerHTML = "";
+      [["PM2.5", r(c.pm2_5)], ["PM10", r(c.pm10)]].forEach(([k, val], i) => {
+        if (i) $("ameta").append(document.createTextNode("  ·  "));
+        $("ameta").append(document.createTextNode(k + " "));
+        const b = document.createElement("b"); b.textContent = val; $("ameta").append(b);
+      });
+      $("ameta").append(document.createTextNode(" µg/m³"));
+      stamp();
+    } catch (e) { $("status").textContent = "Air quality unavailable. Retrying soon."; }
+  }
+
+  function stamp() {
+    $("status").textContent = (cfg.loc ? cfg.loc.name : "") + "  ·  updated " + timeStr(new Date().toISOString());
+  }
+  function refreshAll() { loadWeather(); loadAir(); }
+  setInterval(loadWeather, 10 * 60 * 1000);
+  setInterval(loadAir, 20 * 60 * 1000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) { refreshAll(); keepAwake(); } });
+  window.addEventListener("online", refreshAll);
+
+  /* ---------- Full screen + keep awake ---------- */
+  let lock = null;
+  async function keepAwake() {
+    try { if ("wakeLock" in navigator && !lock) { lock = await navigator.wakeLock.request("screen"); lock.addEventListener("release", () => { lock = null; }); } } catch (e) {}
+  }
+  $("stage").addEventListener("click", () => {
+    keepAwake();
+    const el = document.documentElement;
+    if (!document.fullscreenElement && el.requestFullscreen) el.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
+  });
+
+  /* ---------- Settings ---------- */
+  function syncSeg() {
+    document.querySelectorAll(".seg").forEach(seg => {
+      const k = seg.dataset.key;
+      seg.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(String(cfg[k]) === b.dataset.v)));
+    });
+  }
+  document.querySelectorAll(".seg").forEach(seg => seg.addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    const k = seg.dataset.key, before = cfg[k];
+    cfg[k] = b.dataset.v === "true"; save(); syncSeg(); lastMin = -1; tick();
+    if (k === "fahr" && before !== cfg[k]) loadWeather();
+  }));
+
+  function openSettings() { $("settings").hidden = false; syncSeg(); setTimeout(() => $("cityInput").focus(), 50); }
+  function closeSettings() { if (!cfg.loc) { $("results").innerHTML = '<p class="hint">Pick a city first.</p>'; return; } $("settings").hidden = true; }
+  $("openSettings").addEventListener("click", e => { e.stopPropagation(); openSettings(); });
+  $("closeSettings").addEventListener("click", closeSettings);
+
+  let searchTimer;
+  $("cityInput").addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    const q = $("cityInput").value.trim();
+    if (q.length < 2) { $("results").innerHTML = ""; return; }
+    searchTimer = setTimeout(async () => {
+      try {
+        const g = await getJSON(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=6&language=en`);
+        $("results").innerHTML = "";
+        (g.results || []).forEach(p => {
+          const b = document.createElement("button"); b.type = "button";
+          b.textContent = p.name;
+          const s = document.createElement("small"); s.textContent = [p.admin1, p.country].filter(Boolean).join(", ");
+          b.append(s);
+          b.addEventListener("click", () => setLoc({ name: p.name, lat: p.latitude, lon: p.longitude }));
+          $("results").append(b);
+        });
+        if (!g.results) $("results").innerHTML = '<p class="hint">No match. Try a nearby larger city.</p>';
+      } catch (e) { $("results").innerHTML = '<p class="hint">Search needs an internet connection.</p>'; }
+    }, 300);
+  });
+
+  function setLoc(loc) {
+    cfg.loc = { name: loc.name, lat: +(+loc.lat).toFixed(3), lon: +(+loc.lon).toFixed(3) };
+    save(); $("settings").hidden = true; $("cityInput").value = ""; $("results").innerHTML = "";
+    $("status").textContent = "Loading " + cfg.loc.name + "…"; refreshAll();
+  }
+
+  $("useGps").addEventListener("click", () => {
+    if (!navigator.geolocation) { $("results").innerHTML = '<p class="hint">Location is not available here. Type your city instead.</p>'; return; }
+    navigator.geolocation.getCurrentPosition(
+      p => setLoc({ name: "My location", lat: p.coords.latitude, lon: p.coords.longitude }),
+      () => { $("results").innerHTML = '<p class="hint">Location was blocked. Type your city instead.</p>'; },
+      { timeout: 10000 }
+    );
+  });
+
+  // Location can also come from the link: ?city=Pune&lat=18.52&lon=73.86
+  const qs = new URLSearchParams(location.search);
+  if (qs.get("lat") && qs.get("lon")) { cfg.loc = { name: qs.get("city") || "My location", lat: +qs.get("lat"), lon: +qs.get("lon") }; save(); }
+
+  tick();
+  if (cfg.loc) refreshAll(); else openSettings();
+  if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+})();
+</script>
+</body>
+</html>
