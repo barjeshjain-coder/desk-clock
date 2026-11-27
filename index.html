@@ -78,6 +78,8 @@
   }
   .foot button { all: unset; cursor: pointer; padding: 1vh 1vw; color: var(--faint); letter-spacing: .14em; text-transform: uppercase; }
   .foot button:focus-visible { outline: 1px solid var(--dim); }
+  .awake { color: var(--dim); letter-spacing: .14em; text-transform: uppercase; }
+  .awake[hidden] { display: none; }
 
   /* Portrait: clock on top, weather and air quality below */
   @media (orientation: portrait) {
@@ -150,6 +152,7 @@
 
 <div class="foot">
   <span id="status"></span>
+  <span id="awake" class="awake">Tap anywhere to keep the screen on</span>
   <button id="openSettings" type="button" aria-label="Open settings">Settings</button>
 </div>
 
@@ -171,6 +174,7 @@
   </div>
 </div>
 
+<script src="nosleep.min.js"></script>
 <script>
 (() => {
   const $ = id => document.getElementById(id);
@@ -319,16 +323,44 @@
   document.addEventListener("visibilitychange", () => { if (!document.hidden) { refreshAll(); keepAwake(); } });
   window.addEventListener("online", refreshAll);
 
-  /* ---------- Full screen + keep awake ---------- */
-  let lock = null;
+  /* ---------- Full screen + keep the screen on ---------- */
+  // 1) Screen Wake Lock: asked for as soon as the app opens, and again whenever it is lost.
+  // 2) Older phones without it: NoSleep's silent looping video, started on the first tap.
+  let lock = null, noSleep = null, videoOn = false;
   async function keepAwake() {
-    try { if ("wakeLock" in navigator && !lock) { lock = await navigator.wakeLock.request("screen"); lock.addEventListener("release", () => { lock = null; }); } } catch (e) {}
+    if ("wakeLock" in navigator) {
+      if (lock || document.hidden) return;
+      try {
+        lock = await navigator.wakeLock.request("screen");
+        lock.addEventListener("release", () => { lock = null; showAwake(); if (!document.hidden) setTimeout(keepAwake, 1000); });
+      } catch (e) { lock = null; }
+    }
+    showAwake();
   }
-  $("stage").addEventListener("click", () => {
-    keepAwake();
+  function startVideoFallback() {
+    if (lock || videoOn || !window.NoSleep) return;
+    try {
+      noSleep = noSleep || new NoSleep();
+      const p = noSleep.enable();
+      videoOn = true;
+      if (p && p.catch) p.catch(() => { videoOn = false; showAwake(); });
+    } catch (e) { videoOn = false; }
+    showAwake();
+  }
+  function isAwake() { return !!lock || videoOn; }
+  function showAwake() {
+    const hint = $("awake");
+    if (hint) hint.hidden = isAwake();
+  }
+  function onTap() {
+    keepAwake().then(() => { if (!lock) startVideoFallback(); });
     const el = document.documentElement;
-    if (!document.fullscreenElement && el.requestFullscreen) el.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
-  });
+    if (!document.fullscreenElement && el.requestFullscreen) { const r = el.requestFullscreen({ navigationUI: "hide" }); if (r && r.catch) r.catch(() => {}); }
+  }
+  $("stage").addEventListener("click", onTap);
+  document.addEventListener("touchend", () => { if (!isAwake()) onTap(); }, { passive: true });
+  setInterval(() => { if (!isAwake()) keepAwake(); }, 30000);
+  keepAwake();
 
   /* ---------- Settings ---------- */
   function syncSeg() {
