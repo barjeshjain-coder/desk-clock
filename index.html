@@ -119,6 +119,27 @@
   .actions button.primary { background: #fff; color: #000; border-color: #fff; }
   .hint { color: var(--dim); font-size: 14px; line-height: 1.5; margin: 0; }
 
+  /* ---------- Themes ---------- */
+  /* Colour: blue accents, temperature tinted by how warm it is, AQI in the standard US EPA band colours. */
+  body.t-color { --accent: #5ab8ff; --line: #1d2a3a; --dim: #8fa3b8; --faint: #3c4a5a; }
+  body.t-color .colon { color: var(--accent); }
+  body.t-color .date .wd, body.t-color .label { color: var(--accent); }
+  body.t-color #temp { color: var(--c-temp, #fff); }
+  body.t-color #aqi, body.t-color #aqiText { color: var(--c-aqi, #fff); }
+  body.t-color .scale i { border-color: #333; }
+  body.t-color .scale i.on { border-color: transparent; }
+  body.t-color .scale i:nth-child(1).on { background: #00e400; }
+  body.t-color .scale i:nth-child(2).on { background: #ffff00; }
+  body.t-color .scale i:nth-child(3).on { background: #ff7e00; }
+  body.t-color .scale i:nth-child(4).on { background: #ff0000; }
+  body.t-color .scale i:nth-child(5).on { background: #8f3f97; }
+  body.t-color .scale i:nth-child(6).on { background: #7e0023; }
+  /* Amber: warm, low-blue light for the bedside at night. */
+  body.t-amber { --fg: #ffb547; --dim: #a8742a; --faint: #5a3d14; --line: #2e1f0a; }
+  body.t-amber, body.t-amber .time, body.t-amber .scale i.on { color: var(--fg); }
+  body.t-amber .scale i.on { background: var(--fg); border-color: var(--fg); }
+  body.t-amber .scale i { border-color: var(--dim); }
+
   @media (prefers-reduced-motion: reduce) { .time .colon { animation: none; } #stage { transition: none; } }
 </style>
 </head>
@@ -162,11 +183,12 @@
     <input type="text" id="cityInput" placeholder="Type your city, e.g. Bengaluru" autocomplete="off">
     <div class="results" id="results"></div>
     <h2>Display</h2>
+    <div class="opt"><span>Theme</span><div class="seg" data-key="theme"><button type="button" data-v="mono">Mono</button><button type="button" data-v="color">Colour</button><button type="button" data-v="amber">Amber</button></div></div>
     <div class="opt"><span>Clock</span><div class="seg" data-key="h24"><button type="button" data-v="false">12 h</button><button type="button" data-v="true">24 h</button></div></div>
     <div class="opt"><span>Seconds</span><div class="seg" data-key="secs"><button type="button" data-v="true">Show</button><button type="button" data-v="false">Hide</button></div></div>
     <div class="opt"><span>Temperature</span><div class="seg" data-key="fahr"><button type="button" data-v="false">°C</button><button type="button" data-v="true">°F</button></div></div>
     <div class="opt"><span>Dim 10 pm – 6 am</span><div class="seg" data-key="night"><button type="button" data-v="true">On</button><button type="button" data-v="false">Off</button></div></div>
-    <p class="hint">Tap anywhere on the clock to go full screen and keep the screen awake.</p>
+    <p class="hint" id="tapHint">Tap anywhere on the clock to go full screen and keep the screen awake.</p>
     <h2>Freeze log</h2>
     <p class="hint" id="stallLog">None recorded.</p>
     <div class="actions">
@@ -180,7 +202,10 @@
 (() => {
   const $ = id => document.getElementById(id);
   const STORE = "deskclock.v1";
-  const defaults = { h24: false, secs: true, fahr: false, night: true, loc: null };
+  const defaults = { h24: false, secs: true, fahr: false, night: true, theme: "mono", loc: null };
+  // Running inside the Android app: it keeps the screen on itself, so no wake lock, video or full-screen tap.
+  const NATIVE = /DeskClockApp/.test(navigator.userAgent);
+  function applyTheme() { document.body.className = document.body.className.replace(/\bt-\w+/g, "").trim(); document.body.classList.add("t-" + (cfg.theme || "mono")); }
   let cfg = Object.assign({}, defaults);
   try { Object.assign(cfg, JSON.parse(localStorage.getItem(STORE) || "{}")); } catch (e) {}
   const save = () => { try { localStorage.setItem(STORE, JSON.stringify(cfg)); } catch (e) {} };
@@ -259,6 +284,8 @@
       const w = await getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1${u}`);
       const c = w.current;
       $("temp").textContent = r(c.temperature_2m);
+      const tc = cfg.fahr ? (c.temperature_2m - 32) / 1.8 : c.temperature_2m;
+      document.body.style.setProperty("--c-temp", tc < 5 ? "#8ec9ff" : tc < 15 ? "#5ab8ff" : tc < 25 ? "#7be0a8" : tc < 32 ? "#ffc247" : tc < 38 ? "#ff8a3d" : "#ff4d4d");
       $("tunit").textContent = cfg.fahr ? "°F" : "°C";
       $("cond").textContent = WMO[c.weather_code] || "—";
       pairs($("wmeta"), [["High", r(w.daily.temperature_2m_max[0]) + "°"], ["Low", r(w.daily.temperature_2m_min[0]) + "°"]]);
@@ -276,6 +303,8 @@
       $("aqi").textContent = isFinite(v) ? v : "--";
       const band = AQI_BANDS.findIndex(([max]) => v <= max);
       $("aqiText").textContent = band >= 0 ? AQI_BANDS[band][1] : "—";
+      // EPA colours; yellow/maroon lifted slightly so they read on black.
+      document.body.style.setProperty("--c-aqi", ["#00e400","#ffff00","#ff7e00","#ff3b3b","#b45cc0","#c0284a"][band] || "#fff");
       Array.prototype.forEach.call($("scale").children, (el, i) => el.classList.toggle("on", i <= band));
       pairs($("ameta"), [["PM2.5", r(c.pm2_5)], ["PM10", r(c.pm10)]]);
       stamp(); fit();
@@ -345,6 +374,7 @@
   // 2) A silent looping video (below) that also stops Chrome freezing the page.
   let lock = null, videoOn = false;
   async function keepAwake() {
+    if (NATIVE) return;
     if ("wakeLock" in navigator) {
       if (lock || document.hidden) return;
       try {
@@ -378,14 +408,17 @@
     if (hint) hint.hidden = isAwake();
   }
   function onTap() {
+    if (NATIVE) return;
     keepAwake().then(startVideoFallback);
     const el = document.documentElement;
     if (!document.fullscreenElement && el.requestFullscreen) { const r = el.requestFullscreen({ navigationUI: "hide" }); if (r && r.catch) r.catch(() => {}); }
   }
   $("stage").addEventListener("click", onTap);
-  document.addEventListener("touchend", () => { if (!isAwake() || !videoOn) onTap(); }, { passive: true });
-  setInterval(() => { if (!lock) keepAwake(); if (!videoOn) startVideoFallback(); }, 30000);
-  keepAwake(); startVideoFallback(); // muted video may autostart without a tap
+  if (NATIVE) { $("awake").hidden = true; } else {
+    document.addEventListener("touchend", () => { if (!isAwake() || !videoOn) onTap(); }, { passive: true });
+    setInterval(() => { if (!lock) keepAwake(); if (!videoOn) startVideoFallback(); }, 30000);
+    keepAwake(); startVideoFallback(); // muted video may autostart without a tap
+  }
 
   /* ---------- Settings ---------- */
   function syncSeg() {
@@ -397,7 +430,7 @@
   document.querySelectorAll(".seg").forEach(seg => seg.addEventListener("click", e => {
     const b = e.target.closest("button"); if (!b) return;
     const k = seg.dataset.key, before = cfg[k];
-    cfg[k] = b.dataset.v === "true"; save(); syncSeg(); lastMin = -1; tick(); fit();
+    const v = b.dataset.v; cfg[k] = v === "true" ? true : v === "false" ? false : v; save(); syncSeg(); applyTheme(); lastMin = -1; tick(); fit();
     if (k === "fahr" && before !== cfg[k]) loadWeather();
   }));
 
@@ -449,11 +482,13 @@
 
   // Location can also come from the link: ?city=Pune&lat=18.52&lon=73.86
   const qs = new URLSearchParams(location.search);
+  if (/^(mono|color|amber)$/.test(qs.get("theme") || "")) { cfg.theme = qs.get("theme"); save(); }
   if (qs.get("lat") && qs.get("lon")) { cfg.loc = { name: qs.get("city") || "My location", lat: +qs.get("lat"), lon: +qs.get("lon") }; save(); }
 
+  applyTheme(); if (NATIVE) $("tapHint").hidden = true;
   tick(); fit();
   if (cfg.loc) refreshAll(); else openSettings();
-  if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+  if (!NATIVE && "serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
 })();
 </script>
 </body>

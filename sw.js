@@ -1,5 +1,5 @@
 // Offline support: the app shell is cached; weather/AQI always come live from the network.
-const CACHE = "desk-clock-v5";
+const CACHE = "desk-clock-v6";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png", "./silent.webm", "./silent.mp4"];
 
 self.addEventListener("install", e => {
