@@ -37,27 +37,27 @@
   }
   #stage {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    padding: 4vh 4vw 9vh 4vw;
+    padding: 2vh 2.5vw 6.5vh 2.5vw;
     display: flex; flex-direction: row; align-items: center;
     transition: opacity 2s ease, transform 3s ease;
   }
   body.night #stage { opacity: .42; }
 
   /* Sizes below are starting points; fit() in the script scales them to fill the actual screen. */
-  .clock { flex: 1.9 1 0; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
-  .time { display: inline-flex; align-items: flex-start; line-height: .86; font-weight: 200; letter-spacing: -.04em; font-size: 120px; white-space: nowrap; }
-  .time .colon { animation: blink 2s steps(1) infinite; padding: 0 .02em; }
+  .clock { flex: 2.9 1 0; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
+  .time { display: inline-flex; align-items: flex-start; line-height: .86; font-weight: 300; letter-spacing: -.05em; font-size: 120px; white-space: nowrap; }
+  .time .colon { animation: blink 2s steps(1) infinite; padding: 0; }
   @keyframes blink { 50% { opacity: .25; } }
-  .time .side { display: flex; flex-direction: column; justify-content: space-between; margin-left: .12em; padding-top: .06em; height: .74em; }
-  .time .sec, .time .ampm { font-size: .17em; font-weight: 300; letter-spacing: .02em; color: var(--dim); line-height: 1; }
-  .date { display: inline-block; margin-top: .4em; font-size: 24px; font-weight: 300; letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; padding-left: .2em; }
+  .time .side { display: flex; flex-direction: column; justify-content: space-between; margin-left: .06em; padding-top: .04em; height: .74em; }
+  .time .sec, .time .ampm { font-size: .14em; font-weight: 300; letter-spacing: .02em; color: var(--dim); line-height: 1; }
+  .date { display: inline-block; margin-top: .3em; font-size: 24px; font-weight: 300; letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; padding-left: .12em; }
   .date .wd { font-weight: 500; }
 
-  hr { border: 0; border-left: 1px solid var(--line); align-self: stretch; margin: 2vh 2.5vw; }
+  hr { border: 0; border-left: 1px solid var(--line); align-self: stretch; margin: 3vh 2vw; }
 
   .info { flex: 1 1 0; min-width: 0; font-size: 20px; }
   .info-in { display: inline-block; }
-  .block + .block { margin-top: 1.1em; }
+  .block + .block { margin-top: .9em; }
   .label { font-size: .5em; letter-spacing: .22em; text-transform: uppercase; color: var(--dim); white-space: nowrap; }
   .big { font-size: 2.9em; font-weight: 200; line-height: 1; letter-spacing: -.03em; margin: .06em 0 .02em; white-space: nowrap; }
   .big .unit { font-size: .45em; vertical-align: .75em; letter-spacing: 0; color: var(--dim); margin-left: .04em; }
@@ -72,9 +72,9 @@
 
   .foot {
     position: fixed; left: 0; right: 0; bottom: 0;
-    padding: 0 4vw 1.6vh 4vw;
+    padding: 0 2.5vw 1.2vh 2.5vw;
     display: flex; justify-content: space-between; align-items: center;
-    font-size: 2.8vh; color: var(--faint); letter-spacing: .08em;
+    font-size: 2.6vh; color: var(--faint); letter-spacing: .08em;
   }
   .foot button { all: unset; cursor: pointer; padding: 1vh 1vw; color: var(--faint); letter-spacing: .14em; text-transform: uppercase; }
   .foot button:focus-visible { outline: 1px solid var(--dim); }
@@ -141,7 +141,7 @@
       <div class="meta" id="wmeta2">&nbsp;</div>
     </div>
     <div class="block">
-      <div class="label">Air quality · US AQI</div>
+      <div class="label">Air · US AQI</div>
       <div class="big" id="aqi">--</div>
       <div class="row"><span class="cond" id="aqiText">Loading</span></div>
       <div class="meta" id="ameta">&nbsp;</div>
@@ -167,6 +167,8 @@
     <div class="opt"><span>Temperature</span><div class="seg" data-key="fahr"><button type="button" data-v="false">°C</button><button type="button" data-v="true">°F</button></div></div>
     <div class="opt"><span>Dim 10 pm – 6 am</span><div class="seg" data-key="night"><button type="button" data-v="true">On</button><button type="button" data-v="false">Off</button></div></div>
     <p class="hint">Tap anywhere on the clock to go full screen and keep the screen awake.</p>
+    <h2>Freeze log</h2>
+    <p class="hint" id="stallLog">None recorded.</p>
     <div class="actions">
       <button type="button" id="useGps">Use my location</button>
       <button type="button" class="primary" id="closeSettings">Done</button>
@@ -174,7 +176,6 @@
   </div>
 </div>
 
-<script src="nosleep.min.js"></script>
 <script>
 (() => {
   const $ = id => document.getElementById(id);
@@ -188,9 +189,22 @@
   const pad = n => ("0" + n).slice(-2);
   const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
   const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-  let lastMin = -1;
+  let lastMin = -1, lastTick = Date.now();
+  // Stall log: if the page was frozen (e.g. the phone throttled Chrome overnight),
+  // note when and for how long, then recover: refit, refresh data, re-take the wake lock.
+  const LOG = "deskclock.stalls";
+  function logStall(kind, secs) {
+    try {
+      const list = JSON.parse(localStorage.getItem(LOG) || "[]");
+      list.unshift(new Date().toLocaleString() + "  " + kind + (secs ? " " + secs + "s" : ""));
+      localStorage.setItem(LOG, JSON.stringify(list.slice(0, 15)));
+    } catch (e) {}
+  }
+  function recover() { lastMin = -1; if (typeof refreshAll === "function") refreshAll(); if (typeof keepAwake === "function") keepAwake(); }
   function tick() {
     const d = new Date();
+    const gap = d.getTime() - lastTick; lastTick = d.getTime();
+    if (gap > 15000) { logStall("stalled", Math.round(gap / 1000)); recover(); }
     let h = d.getHours();
     $("ampm").textContent = cfg.h24 ? "" : (h < 12 ? "AM" : "PM");
     if (!cfg.h24) h = h % 12 || 12;
@@ -201,7 +215,7 @@
       lastMin = d.getMinutes();
       $("date").innerHTML = "";
       const wd = document.createElement("span"); wd.className = "wd"; wd.textContent = DAYS[d.getDay()];
-      $("date").append(wd, document.createTextNode(" · " + d.getDate() + " " + MONTHS[d.getMonth()] + " " + d.getFullYear()));
+      $("date").append(wd, document.createTextNode(" · " + d.getDate() + " " + MONTHS[d.getMonth()].slice(0, 3)));
       const hr = d.getHours();
       document.body.classList.toggle("night", cfg.night && (hr >= 22 || hr < 6));
       // Nudge the layout a few pixels each minute so an OLED screen doesn't burn in.
@@ -210,7 +224,11 @@
       if (typeof fit === "function") fit();
     }
   }
+  // Two independent timers drive the clock, so one being throttled doesn't stop it.
   setInterval(tick, 250);
+  (function rafLoop() { requestAnimationFrame(() => { if (Date.now() - lastTick > 900) tick(); rafLoop(); }); })();
+  ["freeze", "resume", "pageshow", "focus"].forEach(ev =>
+    (ev === "freeze" || ev === "resume" ? document : window).addEventListener(ev, () => { if (ev !== "focus") logStall(ev); tick(); if (ev !== "freeze") recover(); }));
 
   /* ---------- Weather ---------- */
   const WMO = {
@@ -244,7 +262,7 @@
       $("tunit").textContent = cfg.fahr ? "°F" : "°C";
       $("cond").textContent = WMO[c.weather_code] || "—";
       pairs($("wmeta"), [["High", r(w.daily.temperature_2m_max[0]) + "°"], ["Low", r(w.daily.temperature_2m_min[0]) + "°"]]);
-      pairs($("wmeta2"), [["Feels", r(c.apparent_temperature) + "°"], ["Humidity", c.relative_humidity_2m + "%"]]);
+      pairs($("wmeta2"), [["Feels", r(c.apparent_temperature) + "°"], ["RH", c.relative_humidity_2m + "%"]]);
       stamp(); fit();
     } catch (e) { $("status").textContent = "Weather unavailable. Retrying soon."; }
   }
@@ -260,7 +278,6 @@
       $("aqiText").textContent = band >= 0 ? AQI_BANDS[band][1] : "—";
       Array.prototype.forEach.call($("scale").children, (el, i) => el.classList.toggle("on", i <= band));
       pairs($("ameta"), [["PM2.5", r(c.pm2_5)], ["PM10", r(c.pm10)]]);
-      $("ameta").appendChild(document.createTextNode(" µg/m³"));
       stamp(); fit();
     } catch (e) { $("status").textContent = "Air quality unavailable. Retrying soon."; }
   }
@@ -291,10 +308,10 @@
     const tw = time.getBoundingClientRect().width, th = time.getBoundingClientRect().height;
     const dw = date.getBoundingClientRect().width, dh = date.getBoundingClientRect().height + 40;
 
-    const cW = (portrait ? W : clock.getBoundingClientRect().width) * 0.97;
+    const cW = (portrait ? W : clock.getBoundingClientRect().width) * 0.99;
     const cHmax = portrait ? H * 0.46 : H;
-    let tf = Math.min(cW / tw, cHmax * 0.74 / th) * 100;
-    let df = Math.min(cW / dw * 100, tf * 0.17);
+    let tf = Math.min(cW / tw, cHmax * 0.8 / th) * 100;
+    let df = Math.min(cW / dw * 100, tf * 0.15);
     const used = (th * tf + dh * df) / 100;
     if (used > cHmax) { const k = cHmax / used; tf *= k; df *= k; }
     time.style.fontSize = tf.toFixed(1) + "px"; date.style.fontSize = df.toFixed(1) + "px";
@@ -325,8 +342,8 @@
 
   /* ---------- Full screen + keep the screen on ---------- */
   // 1) Screen Wake Lock: asked for as soon as the app opens, and again whenever it is lost.
-  // 2) Older phones without it: NoSleep's silent looping video, started on the first tap.
-  let lock = null, noSleep = null, videoOn = false;
+  // 2) A silent looping video (below) that also stops Chrome freezing the page.
+  let lock = null, videoOn = false;
   async function keepAwake() {
     if ("wakeLock" in navigator) {
       if (lock || document.hidden) return;
@@ -337,15 +354,23 @@
     }
     showAwake();
   }
+  // Silent looping video, always on: Chrome does not freeze a page that is playing media,
+  // and on phones without Wake Lock it also keeps the screen awake. Muted, so it may start without a tap.
+  let vid = null;
   function startVideoFallback() {
-    if (lock || videoOn || !window.NoSleep) return;
-    try {
-      noSleep = noSleep || new NoSleep();
-      const p = noSleep.enable();
-      videoOn = true;
-      if (p && p.catch) p.catch(() => { videoOn = false; showAwake(); });
-    } catch (e) { videoOn = false; }
-    showAwake();
+    if (!vid) {
+      vid = document.createElement("video");
+      vid.muted = true; vid.loop = true; vid.playsInline = true;
+      vid.setAttribute("muted", ""); vid.setAttribute("playsinline", ""); vid.setAttribute("aria-hidden", "true");
+      vid.style.cssText = "position:fixed;left:0;bottom:0;width:2px;height:2px;opacity:.01;pointer-events:none;";
+      [["silent.webm", "video/webm"], ["silent.mp4", "video/mp4"]].forEach(([src, type]) => {
+        const so = document.createElement("source"); so.src = src; so.type = type; vid.appendChild(so);
+      });
+      vid.addEventListener("playing", () => { videoOn = true; showAwake(); });
+      vid.addEventListener("pause", () => { videoOn = false; showAwake(); });
+      document.body.appendChild(vid);
+    }
+    try { const p = vid.play(); if (p && p.catch) p.catch(() => { videoOn = false; showAwake(); }); } catch (e) {}
   }
   function isAwake() { return !!lock || videoOn; }
   function showAwake() {
@@ -353,14 +378,14 @@
     if (hint) hint.hidden = isAwake();
   }
   function onTap() {
-    keepAwake().then(() => { if (!lock) startVideoFallback(); });
+    keepAwake().then(startVideoFallback);
     const el = document.documentElement;
     if (!document.fullscreenElement && el.requestFullscreen) { const r = el.requestFullscreen({ navigationUI: "hide" }); if (r && r.catch) r.catch(() => {}); }
   }
   $("stage").addEventListener("click", onTap);
-  document.addEventListener("touchend", () => { if (!isAwake()) onTap(); }, { passive: true });
-  setInterval(() => { if (!isAwake()) keepAwake(); }, 30000);
-  keepAwake();
+  document.addEventListener("touchend", () => { if (!isAwake() || !videoOn) onTap(); }, { passive: true });
+  setInterval(() => { if (!lock) keepAwake(); if (!videoOn) startVideoFallback(); }, 30000);
+  keepAwake(); startVideoFallback(); // muted video may autostart without a tap
 
   /* ---------- Settings ---------- */
   function syncSeg() {
@@ -376,7 +401,11 @@
     if (k === "fahr" && before !== cfg[k]) loadWeather();
   }));
 
-  function openSettings() { $("settings").hidden = false; syncSeg(); setTimeout(() => $("cityInput").focus(), 50); }
+  function openSettings() {
+    let list = []; try { list = JSON.parse(localStorage.getItem(LOG) || "[]"); } catch (e) {}
+    $("stallLog").innerHTML = ""; if (!list.length) $("stallLog").textContent = "None recorded.";
+    list.forEach((t, i) => { if (i) $("stallLog").appendChild(document.createElement("br")); $("stallLog").appendChild(document.createTextNode(t)); });
+    $("settings").hidden = false; syncSeg(); setTimeout(() => $("cityInput").focus(), 50); }
   function closeSettings() { if (!cfg.loc) { $("results").innerHTML = '<p class="hint">Pick a city first.</p>'; return; } $("settings").hidden = true; }
   $("openSettings").addEventListener("click", e => { e.stopPropagation(); openSettings(); });
   $("closeSettings").addEventListener("click", closeSettings);
